@@ -31,6 +31,8 @@ class PostView extends Component {
 
     componentDidMount = () => {
 
+        if (this.props.location.editPostNow) this.changePostMode()
+
         if (!this.props.post) {
             fetchPost(this.props.selectedPostId).then(post => {
                 //if post doesn't exists, take to 404

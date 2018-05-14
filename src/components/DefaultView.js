@@ -5,11 +5,11 @@ import React, { Component } from 'react';
 //react-redux
 import { connect } from 'react-redux'
 //bootstrap
-import { Grid, Row, Col, Tab, Tabs, Button, ButtonToolbar, Glyphicon, Well, Tooltip, OverlayTrigger } from 'react-bootstrap'
+import { Grid, Row, Col, Tab, Tabs, Button, ButtonToolbar, Glyphicon, Well, Tooltip, OverlayTrigger, Modal } from 'react-bootstrap'
 //actions
 import { addCategory, setAllPosts, editPost } from '../actions'
 //utils
-import { fetchCategories, fetchPosts, votePost } from '../utils/api'
+import { fetchCategories, fetchPosts, votePost, deletePost } from '../utils/api'
 //react-bootstrap-table
 import { BootstrapTable, TableHeaderColumn } from 'react-bootstrap-table';
 import 'react-bootstrap-table/dist/react-bootstrap-table-all.min.css';
@@ -17,6 +17,10 @@ import 'react-bootstrap-table/dist/react-bootstrap-table-all.min.css';
 import { routes } from '../routes/index'
 
 class DefaultView extends Component {
+
+    state = {
+        showDeletePostModal: false
+    }
 
     componentDidMount = () => {
 
@@ -28,6 +32,11 @@ class DefaultView extends Component {
             this.props.setAllPosts(posts);
         })
     }
+
+    toggleDeletePostModal = () => this.setState({
+        ...this.state,
+        showDeletePostModal: !this.state.showDeletePostModal
+    })
 
     upvotePost = (id) => {
         votePost({
@@ -47,7 +56,40 @@ class DefaultView extends Component {
         )
     }
 
-    buttonFormatter = (cell, { id, author, body }) => {
+    deletePost = () => {
+        deletePost({
+            postId: this.state.selectedPostId
+        }, (postData) => {
+            this.props.editPost(postData);
+            this.toggleDeletePostModal();
+        });
+    }
+
+    deletePostModal = () => {
+        return (
+            <Modal show={this.state.showDeletePostModal} onHide={this.toggleDeletePostModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Are you sure?</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <h4>You're going to delete this post permanently</h4>
+                    <p>Click Accept to proceed or Cancel to exit without making changes</p>
+                    <br />
+                    <br />
+                    <ButtonToolbar>
+                        <Button bsSize="small" bsStyle="success" onClick={this.deletePost.bind(this)}>
+                            <Glyphicon glyph="ok" /> Accept
+                            </Button>
+                        <Button bsSize="small" bsStyle="danger" onClick={this.toggleDeletePostModal}>
+                            <Glyphicon glyph="remove" /> Cancel
+                            </Button>
+                    </ ButtonToolbar>
+                </Modal.Body>
+            </Modal>
+        )
+    }
+
+    buttonFormatter = (cell, { id, author, body, category }) => {
         return (
             <ButtonToolbar>
                 <OverlayTrigger placement="top" overlay={<Tooltip id="tooltipThumbsUp">Upvote Post</Tooltip>}>
@@ -59,6 +101,23 @@ class DefaultView extends Component {
                 <OverlayTrigger placement="top" overlay={<Tooltip id="tooltipThumbsDown">Downvote Post</Tooltip>}>
                     <Button bsSize="small" onClick={() => this.downvotePost(id)}>
                         <Glyphicon glyph="thumbs-down" />
+                    </Button>
+                </OverlayTrigger>
+
+                <OverlayTrigger placement="top" overlay={<Tooltip id="tooltipEdit">Edit Post</Tooltip>}>
+                    <Link to={{ pathname: '/' + category + '/' + id, editPostNow: true }}>
+                        <Button bsSize="small">
+                            <Glyphicon glyph="pencil" />
+                        </Button>
+                    </Link>
+                </OverlayTrigger>
+
+                <OverlayTrigger placement="top" overlay={<Tooltip id="tooltipDelete">Delete Post</Tooltip>}>
+                    <Button bsSize="small" onClick={() => this.setState(
+                        { selectedPostId: id },
+                        () => this.toggleDeletePostModal()
+                    )}>
+                        <Glyphicon glyph="remove" />
                     </Button>
                 </OverlayTrigger>
             </ ButtonToolbar>
@@ -81,8 +140,9 @@ class DefaultView extends Component {
                                         <Glyphicon glyph="plus" /> Add Post
                                     </Button>
                                 </Well>
+                                {this.deletePostModal()}
                                 <BootstrapTable data={posts} striped hover>
-                                    <TableHeaderColumn isKey dataField='id' dataFormat={(cell, row) => <Link to={`/${row.category}/${row.id}`}>{row.id}</Link>}>Post ID</TableHeaderColumn>
+                                    <TableHeaderColumn isKey dataField='id' dataFormat={(cell, row) => <Link to={'/' + row.category + '/' + row.id}>{row.id}</Link>}>Post ID</TableHeaderColumn>
                                     <TableHeaderColumn dataField='title' tdStyle={{ whiteSpace: 'normal' }}>Title</TableHeaderColumn>
                                     <TableHeaderColumn dataField='author' width='130' dataSort>Author</TableHeaderColumn>
                                     <TableHeaderColumn dataField='commentCount' width='100'>Comments</TableHeaderColumn>
@@ -94,7 +154,7 @@ class DefaultView extends Component {
                             </Tab>
                             <Tab eventKey={2} title="Categories">
                                 <BootstrapTable data={categories} striped hover>
-                                    <TableHeaderColumn isKey dataField='name' dataSort dataFormat={(cell, row) => <Link to={`/${row.name}`}>{row.name}</Link>}>Name</TableHeaderColumn>
+                                    <TableHeaderColumn isKey dataField='name' dataSort dataFormat={(cell, row) => <Link to={'/' + row.name}>{row.name}</Link>}>Name</TableHeaderColumn>
                                     <TableHeaderColumn dataField='path'>Path</TableHeaderColumn>
                                 </BootstrapTable>
                             </Tab>
@@ -107,10 +167,9 @@ class DefaultView extends Component {
 }
 
 function mapStateToProps({ categories, posts }) {
-
     return {
         categories: Object.keys(categories).map(category => categories[category]),
-        posts: posts['posts']
+        posts: posts['posts'].filter(post => post.deleted === false)
     }
 }
 
